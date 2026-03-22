@@ -1,0 +1,454 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ENABLED
+  DISABLED
+}
+
+enum GenericStatus {
+  ENABLED
+  DISABLED
+}
+
+enum ProductStatus {
+  DRAFT
+  ON_SALE
+  OFF_SHELF
+}
+
+enum TaskStatus {
+  OPEN
+  IN_REVIEW
+  DONE
+  CANCELLED
+}
+
+model User {
+  id            String         @id @default(uuid())
+  username      String         @unique
+  passwordHash  String         @map("password_hash")
+  realName      String         @map("real_name")
+  mobile        String?        @map("mobile")
+  status        UserStatus     @default(ENABLED)
+  lastLoginAt   DateTime?      @map("last_login_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  createdBy     String?        @map("created_by")
+  roles         UserRole[]
+  operationLogs OperationLog[] @relation("OperationLogOperator")
+  ownedTasks     Task[]         @relation("TaskResponsible")
+
+  @@map("users")
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  name        String
+  dataScope   String           @default("ALL") @map("data_scope")
+  status      GenericStatus    @default(ENABLED)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  name        String
+  module      String
+  action      String
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  roleId    String   @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String     @map("role_id")
+  permissionId String     @map("permission_id")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model Customer {
+  id                String    @id @default(uuid())
+  customerNo        String    @unique @map("customer_no")
+  name              String
+  mobile            String?
+  wechatId          String?   @map("wechat_id")
+  wecomNickname     String?   @map("wecom_nickname")
+  sourceChannel     String    @map("source_channel")
+  customerType      String    @map("customer_type")
+  identityTag       String?   @map("identity_tag")
+  interestTags      Json?     @map("interest_tags")
+  lifecycleStage    String    @map("lifecycle_stage")
+  firstContactAt    DateTime? @map("first_contact_at")
+  firstOrderAt      DateTime? @map("first_order_at")
+  lastOrderAt       DateTime? @map("last_order_at")
+  purchaseCount     Int       @default(0) @map("purchase_count")
+  totalAmount       Decimal   @default(0) @db.Decimal(12, 2) @map("total_amount")
+  isMember          Boolean   @default(false) @map("is_member")
+  hasPartnerIntent  Boolean   @default(false) @map("has_partner_intent")
+  isEnterprise      Boolean   @default(false) @map("is_enterprise_customer")
+  followupStatus    String    @default("待跟进") @map("followup_status")
+  nextFollowupAt    DateTime? @map("next_followup_at")
+  ownerId           String?   @map("owner_id")
+  remarks           String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  createdBy         String?   @map("created_by")
+  orders            Order[]
+  followups         Followup[]
+  member            Member?
+  partner           Partner?
+  customerTagRels   CustomerTagRel[]
+
+  @@map("customers")
+}
+
+model CustomerTag {
+  id          String           @id @default(uuid())
+  name        String
+  tagType     String           @map("tag_type")
+  color       String?
+  status      GenericStatus    @default(ENABLED)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  customerRels CustomerTagRel[]
+
+  @@map("customer_tags")
+}
+
+model CustomerTagRel {
+  id         String      @id @default(uuid())
+  customerId String      @map("customer_id")
+  tagId      String      @map("tag_id")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tag        CustomerTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, tagId])
+  @@map("customer_tag_rel")
+}
+
+model ProductCategory {
+  id         String        @id @default(uuid())
+  name       String
+  status     GenericStatus @default(ENABLED)
+  sortOrder  Int           @default(0) @map("sort_order")
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+  products   Product[]
+
+  @@map("product_categories")
+}
+
+model Supplier {
+  id            String        @id @default(uuid())
+  name          String
+  contactName   String?       @map("contact_name")
+  contactMobile String?       @map("contact_mobile")
+  deliveryType  String?       @map("delivery_type")
+  status        GenericStatus @default(ENABLED)
+  remarks       String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  products      Product[]
+
+  @@map("suppliers")
+}
+
+model Product {
+  id                   String          @id @default(uuid())
+  productNo            String          @unique @map("product_no")
+  name                 String
+  categoryId           String?         @map("category_id")
+  isFeatured           Boolean         @default(false) @map("is_featured")
+  isImportedSelected   Boolean         @default(false) @map("is_imported_selected")
+  sellingPoints        String?         @map("selling_points")
+  targetPeople         String?         @map("target_people")
+  targetScenarios      String?         @map("target_scenarios")
+  usageMethod          String?         @map("usage_method")
+  faqs                 Json?
+  recommendedProducts  Json?           @map("recommended_products")
+  repurchaseCycleDays  Int?            @map("repurchase_cycle_days")
+  retailPrice          Decimal?        @db.Decimal(12, 2) @map("retail_price")
+  costPrice            Decimal?        @db.Decimal(12, 2) @map("cost_price")
+  shipmentMode         String?         @map("shipment_mode")
+  supplierId           String?         @map("supplier_id")
+  status               ProductStatus   @default(DRAFT)
+  detailUrl            String?         @map("detail_url")
+  remarks              String?
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+  createdBy            String?         @map("created_by")
+  category             ProductCategory? @relation(fields: [categoryId], references: [id])
+  supplier             Supplier?       @relation(fields: [supplierId], references: [id])
+  orderItems           OrderItem[]
+  followups            Followup[]
+  contentAssets        ContentAsset[]
+
+  @@map("products")
+}
+
+model Order {
+  id                    String        @id @default(uuid())
+  orderNo               String        @unique @map("order_no")
+  customerId            String        @map("customer_id")
+  orderDate             DateTime      @map("order_date")
+  orderChannel          String        @map("order_channel")
+  totalAmount           Decimal       @db.Decimal(12, 2) @map("total_amount")
+  paymentStatus         String        @map("payment_status")
+  paymentMethod         String?       @map("payment_method")
+  shipmentMode          String?       @map("shipment_mode")
+  shipmentOwnerId       String?       @map("shipment_owner_id")
+  shippedAt             DateTime?     @map("shipped_at")
+  shipmentStatus        String        @default("待发货") @map("shipment_status")
+  signStatus            String        @default("待签收") @map("sign_status")
+  signedAt              DateTime?     @map("signed_at")
+  aftersaleStatus       String        @default("无售后") @map("aftersale_status")
+  followupStatus        String        @default("未开始") @map("followup_status")
+  isFollowedUp          Boolean       @default(false) @map("is_followed_up")
+  isRepurchaseCandidate Boolean       @default(false) @map("is_repurchase_candidate")
+  isMemberCandidate     Boolean       @default(false) @map("is_member_candidate")
+  isPartnerCandidate    Boolean       @default(false) @map("is_partner_candidate")
+  remarks               String?
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+  createdBy             String?       @map("created_by")
+  customer              Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  orderItems            OrderItem[]
+  shipments             Shipment[]
+  followups             Followup[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id                  String   @id @default(uuid())
+  orderId             String   @map("order_id")
+  productId           String   @map("product_id")
+  productNameSnapshot String   @map("product_name_snapshot")
+  skuName             String?  @map("sku_name")
+  quantity            Int
+  unitPrice           Decimal  @db.Decimal(12, 2) @map("unit_price")
+  amount              Decimal  @db.Decimal(12, 2)
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  order               Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product             Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@map("order_items")
+}
+
+model Shipment {
+  id                String   @id @default(uuid())
+  orderId           String   @map("order_id")
+  shipmentNo        String   @unique @map("shipment_no")
+  logisticsCompany  String?  @map("logistics_company")
+  trackingNo        String?  @map("tracking_no")
+  shipmentMode      String?  @map("shipment_mode")
+  shipmentStatus    String   @default("待发货") @map("shipment_status")
+  shippedAt         DateTime? @map("shipped_at")
+  signedAt          DateTime? @map("signed_at")
+  responsibleId     String?  @map("responsible_id")
+  remarks           String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("shipments")
+}
+
+model Followup {
+  id                   String    @id @default(uuid())
+  followupNo           String    @unique @map("followup_no")
+  orderId              String    @map("order_id")
+  customerId           String    @map("customer_id")
+  productId            String?   @map("product_id")
+  shippedAt            DateTime? @map("shipped_at")
+  signedAt             DateTime? @map("signed_at")
+  firstFollowupAt      DateTime? @map("first_followup_at")
+  firstResult          String?   @map("first_result")
+  secondFollowupAt     DateTime? @map("second_followup_at")
+  secondResult         String?   @map("second_result")
+  thirdFollowupAt      DateTime? @map("third_followup_at")
+  thirdResult          String?   @map("third_result")
+  satisfactionScore    Int?      @map("satisfaction_score")
+  isRepurchaseFit      Boolean   @default(false) @map("is_repurchase_fit")
+  expectedRepurchaseAt DateTime? @map("expected_repurchase_at")
+  recommendedProductIds Json?    @map("recommended_product_ids")
+  hasRepurchase        Boolean   @default(false) @map("has_repurchase")
+  convertedToMember    Boolean   @default(false) @map("converted_to_member")
+  hasPartnerIntent     Boolean   @default(false) @map("has_partner_intent")
+  responsibleId        String?   @map("responsible_id")
+  remarks              String?
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  createdBy            String?   @map("created_by")
+  order                Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer             Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  product              Product?  @relation(fields: [productId], references: [id])
+
+  @@map("followups")
+}
+
+model Member {
+  id             String    @id @default(uuid())
+  memberNo       String    @unique @map("member_no")
+  customerId     String    @unique @map("customer_id")
+  joinedAt       DateTime  @map("joined_at")
+  status         String
+  level          String?   @default("轻会员")
+  source         String?   @map("source")
+  purchaseCount  Int       @default(0) @map("purchase_count")
+  totalAmount    Decimal   @default(0) @db.Decimal(12, 2) @map("total_amount")
+  lastOrderAt    DateTime? @map("last_order_at")
+  benefitStatus  String?   @map("benefit_status")
+  responsibleId  String?   @map("responsible_id")
+  remarks        String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  customer       Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@map("members")
+}
+
+model Partner {
+  id                String    @id @default(uuid())
+  partnerNo         String    @unique @map("partner_no")
+  customerId        String?   @unique @map("customer_id")
+  name              String
+  mobile            String?
+  wechatId          String?   @map("wechat_id")
+  region            String?
+  identityType      String    @map("identity_type")
+  sourceType        String    @map("source_type")
+  mainProductIds    Json?     @map("main_product_ids")
+  status            String
+  dealSummary       String?   @map("deal_summary")
+  attendedTraining  Boolean   @default(false) @map("attended_training")
+  trainingAt        DateTime? @map("training_at")
+  activationStatus  String    @map("activation_status")
+  responsibleId     String?   @map("responsible_id")
+  remarks           String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  createdBy         String?   @map("created_by")
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@map("partners")
+}
+
+model ContentAsset {
+  id               String    @id @default(uuid())
+  assetNo          String    @unique @map("asset_no")
+  assetDate        DateTime  @map("asset_date")
+  sourceType       String    @map("source_type")
+  productId        String?   @map("product_id")
+  customerType     String?   @map("customer_type")
+  painPoint        String?   @map("pain_point")
+  customerQuote    String?   @map("customer_quote")
+  usageScenario    String?   @map("usage_scenario")
+  feedbackResult   String?   @map("feedback_result")
+  contentAngle     String?   @map("content_angle")
+  titleHook        String?   @map("title_hook")
+  targetPlatform   String?   @map("target_platform")
+  contentFormat    String?   @map("content_format")
+  isPublished      Boolean   @default(false) @map("is_published")
+  publishUrl       String?   @map("publish_url")
+  performanceData  Json?     @map("performance_data")
+  remarks          String?
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  createdBy        String?   @map("created_by")
+  product          Product?  @relation(fields: [productId], references: [id])
+
+  @@map("content_assets")
+}
+
+model OperationLog {
+  id            String   @id @default(uuid())
+  module        String
+  bizType       String   @map("biz_type")
+  bizId         String   @map("biz_id")
+  action        String
+  changeSummary String?  @map("change_summary")
+  beforeData    Json?    @map("before_data")
+  afterData     Json?    @map("after_data")
+  operatorId    String?  @map("operator_id")
+  operatorName  String?  @map("operator_name")
+  createdAt     DateTime @default(now()) @map("created_at")
+  operator      User?    @relation("OperationLogOperator", fields: [operatorId], references: [id], onDelete: SetNull)
+
+  @@map("operation_logs")
+}
+
+model Task {
+  id             String     @id @default(uuid())
+  taskNo         String     @unique @map("task_no")
+  taskType       String     @map("task_type")
+  title          String
+  description    String? 
+  status         TaskStatus @default(OPEN)
+  priority       Int        @default(3)
+  sourceType     String     @map("source_type")
+  sourceId       String     @map("source_id")
+  payload        Json?
+  dueAt          DateTime?  @map("due_at")
+  reviewedAt     DateTime?  @map("reviewed_at")
+  closedAt       DateTime?  @map("closed_at")
+  responsibleId  String?    @map("responsible_id")
+  createdBy      String?    @map("created_by")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+  responsible    User?      @relation("TaskResponsible", fields: [responsibleId], references: [id], onDelete: SetNull)
+
+  @@index([status, taskType])
+  @@index([sourceType, sourceId])
+  @@map("tasks")
+}
+
+model SystemConfig {
+  id          String        @id @default(uuid())
+  configType  String        @map("config_type")
+  configKey   String        @map("config_key")
+  configValue Json          @map("config_value")
+  status      GenericStatus @default(ENABLED)
+  sortOrder   Int           @default(0) @map("sort_order")
+  remarks     String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  @@unique([configType, configKey])
+  @@map("system_configs")
+}
