@@ -9,6 +9,7 @@
  */
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AppLayout } from '../layouts/AppLayout';
+import { GoogleAuthCallbackPage } from '../pages/auth/GoogleAuthCallbackPage';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { DashboardPage } from '../pages/dashboard/DashboardPage';
 import { CustomersPage } from '../pages/customers/CustomersPage';
@@ -33,6 +34,10 @@ const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  {
+    path: '/auth/google/callback',
+    element: <GoogleAuthCallbackPage />,
   },
   {
     path: '/',

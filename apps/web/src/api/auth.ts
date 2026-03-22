@@ -17,3 +17,8 @@ export async function login(payload: LoginPayload) {
   const response = await apiClient.post<LoginResponse>('/auth/login', payload);
   return response.data;
 }
+
+export function getGoogleLoginUrl() {
+  const origin = encodeURIComponent(window.location.origin);
+  return `/api/auth/google?origin=${origin}`;
+}
